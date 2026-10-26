@@ -1,0 +1,9 @@
+{
+  "name": "rickie-hjemmeside",
+  "private": true,
+  "description": "RW Entreprise – rwent.dk",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "nodemailer": "6.9.16"
+  }
+}

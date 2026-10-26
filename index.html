@@ -460,33 +460,41 @@
   const typeSelect = document.getElementById('f-type');
   document.querySelectorAll('[data-topic]').forEach(a => a.addEventListener('click', () => { typeSelect.value = a.dataset.topic; }));
 
-  // Form: sends via Web3Forms once a public access key for rw@rwent.dk is set; until then it opens the mail app
+  // Form: sends through Simply's mail server via /api/send (arrives as ordinary mail from
+  // rw@rwent.dk). If that isn't set up or fails, Web3Forms takes over so nothing is lost.
   const WEB3FORMS_KEY = 'd408809c-045f-4e1d-a05a-5285b34acaa5';
   const form = document.getElementById('contact-form');
   const status = document.getElementById('form-status');
   const sendBtn = form.querySelector('button[type="submit"]');
-  if (WEB3FORMS_KEY) status.textContent = 'Forespørgslen sendes direkte til Rickie.';
+  status.textContent = 'Forespørgslen sendes direkte til Rickie.';
   const setStatus = (text, cls) => { status.textContent = text; status.className = cls || ''; };
+
+  async function sendDirect(f) {
+    const res = await fetch('/api/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: f.name.value, phone: f.phone.value, email: f.email.value, topic: f.topic.value, address: f.address.value, message: f.message.value, botcheck: f.botcheck.checked }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || res.status);
+  }
+  async function sendWeb3Forms(f) {
+    const res = await fetch('https://api.web3forms.com/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ access_key: WEB3FORMS_KEY, subject: 'Tilbud: ' + f.topic.value, from_name: 'rwent.dk', replyto: f.email.value,
+        Navn: f.name.value, Telefon: f.phone.value, 'E-mail': f.email.value, Opgave: f.topic.value, Adresse: f.address.value || '–', Besked: f.message.value || '–', botcheck: f.botcheck.checked }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.message || res.status);
+  }
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
     if (!f.reportValidity()) return;
-    const subject = 'Tilbud: ' + f.topic.value;
-    if (!WEB3FORMS_KEY) {
-      const body = `Navn: ${f.name.value}\nTelefon: ${f.phone.value}\nE-mail: ${f.email.value}\nOpgave: ${f.topic.value}\nAdresse: ${f.address.value}\n\n${f.message.value}`;
-      location.href = `mailto:rw@rwent.dk?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      return;
-    }
     sendBtn.disabled = true;
     setStatus('Sender forespørgslen …');
     try {
-      const res = await fetch('https://api.web3forms.com/submit', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ access_key: WEB3FORMS_KEY, subject, from_name: 'rwent.dk', replyto: f.email.value,
-          Navn: f.name.value, Telefon: f.phone.value, 'E-mail': f.email.value, Opgave: f.topic.value, Adresse: f.address.value || '–', Besked: f.message.value || '–', botcheck: f.botcheck.checked }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.message || res.status);
+      try { await sendDirect(f); } catch (direct) { await sendWeb3Forms(f); }
       f.reset();
       setStatus('Tak! Din forespørgsel er sendt. Vi vender tilbage hurtigst muligt.', 'ok');
     } catch (err) {
