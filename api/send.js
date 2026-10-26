@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
   const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
   const now = Date.now();
   const hits = (recent.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
-  if (hits.length >= 5) return res.status(429).json({ ok: false, error: 'rate' });
+  if (hits.length >= 20) return res.status(429).json({ ok: false, error: 'rate' });
   recent.set(ip, [...hits, now]);
 
   const b = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});

@@ -462,7 +462,7 @@
 
   // Form: sends through Simply's mail server via /api/send (arrives as ordinary mail from
   // rw@rwent.dk). If that isn't set up or fails, Web3Forms takes over so nothing is lost.
-  const WEB3FORMS_KEY = 'd408809c-045f-4e1d-a05a-5285b34acaa5';
+  const WEB3FORMS_KEY = '6dc5a80a-cec2-4cc5-8c6a-3181188c14d8';
   const form = document.getElementById('contact-form');
   const status = document.getElementById('form-status');
   const sendBtn = form.querySelector('button[type="submit"]');
@@ -475,7 +475,12 @@
       body: JSON.stringify({ name: f.name.value, phone: f.phone.value, email: f.email.value, topic: f.topic.value, address: f.address.value, message: f.message.value, botcheck: f.botcheck.checked }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || res.status);
+    if (!res.ok || !data.ok) {
+      const err = new Error(data.error || res.status);
+      // only fall back when the mail server itself is unavailable, not when the input was rejected
+      err.fallback = !['invalid', 'rate', 'origin'].includes(data.error);
+      throw err;
+    }
   }
   async function sendWeb3Forms(f) {
     const res = await fetch('https://api.web3forms.com/submit', {
@@ -494,7 +499,7 @@
     sendBtn.disabled = true;
     setStatus('Sender forespørgslen …');
     try {
-      try { await sendDirect(f); } catch (direct) { await sendWeb3Forms(f); }
+      try { await sendDirect(f); } catch (direct) { if (direct.fallback === false) throw direct; await sendWeb3Forms(f); }
       f.reset();
       setStatus('Tak! Din forespørgsel er sendt. Vi vender tilbage hurtigst muligt.', 'ok');
     } catch (err) {
